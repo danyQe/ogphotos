@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<section id="settings" class="settings">
+  <form id="thresholds" class="card tunables">
+    <h2>Similarity thresholds</h2>
+    <p class="muted">Two photos are similar if <em>either</em> test passes. New photos use changes at once; run <strong>Regroup all</strong> to apply them to existing groups.</p>
+    {% for t, value in similarity_tunables %}
+    <label>
+      <span>{{ t.label }}</span>
+      <input type="number" name="{{ t.key }}" value="{{ value }}" min="{{ t.lo }}" max="{{ t.hi }}" step="{{ t.step }}" required>
+      <span class="muted">{{ t.lo | round(3) }} – {{ t.hi | round(3) }}</span>
+    </label>
+    {% endfor %}
+    <div class="toolbar">
+      <button type="submit" class="button">Save</button>
+      <span class="status" role="status" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <div class="card">
+    <h2>Regroup all</h2>
+    <p class="muted">Rebuilds every group from scratch with the current thresholds. Your “Not similar” choices are kept, but <strong>all reviewed marks are cleared</strong>.</p>
+    <div class="toolbar">
+      <button type="button" class="button danger" data-action="regroup" {% if s.regroup.status == "running" %}disabled{% endif %}>Regroup all…</button>
+      <span id="regroup-status" class="status" role="status" aria-live="polite" data-status="{{ s.regroup.status }}">{% if s.regroup.status == "running" %}Regrouping…{% endif %}</span>
+    </div>
+  </div>
+
+  <form id="face-settings" class="card tunables">
+    <h2>Faces</h2>
+    <dl class="meta">
+      <dt>Model</dt><dd>{{ s.faces.model.model }}{% if not s.faces.model_installed %} — <strong>not installed</strong>: <a href="{{ s.faces.setup_url }}">download it on the Set up models page</a>{% endif %}</dd>
+      <dt>Scanned</dt><dd>{{ s.faces.done }} done · {{ s.faces.pending }} pending · {{ s.faces.failed }} failed{% if s.faces.error %} <span class="muted">— {{ s.faces.error }}</span>{% endif %}</dd>
+    </dl>
+    <label><span>Scan photos for faces</span><input type="checkbox" data-action="scanning" {% if s.faces.enabled %}checked{% endif %}></label>
+    {% for t, value in face_tunables %}
+    <label>
+      <span>{{ t.label }}</span>
+      <input type="number" name="{{ t.key }}" value="{{ value }}" min="{{ t.lo }}" max="{{ t.hi }}" step="{{ t.step }}" required>
+      <span class="muted">{{ t.lo | round(3) }} – {{ t.hi | round(3) }}</span>
+    </label>
+    {% endfor %}
+    <p class="muted">New faces use changes at once; <strong>Recluster faces</strong> applies them to all. Names and faces you placed by hand are kept.</p>
+    <div class="toolbar">
+      <button type="submit" class="button">Save</button>
+      <button type="button" class="button secondary" data-action="retry-faces">Retry failed</button>
+      <button type="button" class="button secondary" data-action="recluster" {% if s.faces.recluster.status == "running" %}disabled{% endif %}>Recluster faces</button>
+      <span id="recluster-status" class="status" role="status" aria-live="polite" data-status="{{ s.faces.recluster.status }}"></span>
+    </div>
+  </form>
+
+  <div class="card">
+    <h2>Model and library</h2>
+    <dl class="meta">
+      <dt>Model</dt><dd>{{ s.model.model }}</dd>
+      <dt>Device</dt><dd>{{ s.model.device }} · {{ s.model.dtype }}{% if s.model.loaded != "true" %} <span class="muted">(loads on first analysis)</span>{% endif %}</dd>
+      {% if s.model.image_tokens %}<dt>Image tokens</dt><dd>{{ s.model.image_tokens }}</dd>{% endif %}
+      <dt>Analysis</dt><dd>{{ s.analysis.done }} done · {{ s.analysis.pending }} pending · {{ s.analysis.failed }} failed</dd>
+      <dt>Library</dt><dd>{{ s.library.files }} files · {{ s.library.groups }} groups · {{ s.library.trashed }} in Trash</dd>
+      <dt>Library folder</dt><dd><code>{{ s.data_dir }}</code></dd>
+      <dt>Saved in</dt><dd><code>{{ s.config_file }}</code> <span class="muted">— to move the library, stop OGphotos, move the folder, and update <code>data_dir</code> there</span></dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>About</h2>
+    <p><strong>OGphotos {{ app_version }}</strong> — MIT license. Third-party components and model licenses are listed in <code>THIRD_PARTY_LICENSES.md</code> in the OGphotos install folder.</p>
+    <p class="muted">Not affiliated with Google. Google Photos is a trademark of Google LLC.</p>
+  </div>
+</section>
+<script src="/static/settings.js" defer></script>
+{% endblock %}

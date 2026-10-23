@@ -1,0 +1,6 @@
+#!/bin/sh
+# OGphotos.app entry point: run the launcher in Terminal so the user sees first-run progress.
+# The user approved the app (right-click → Open), so clear quarantine on the payload first;
+# otherwise Gatekeeper blocks launch.sh and the bundled uv when Terminal runs them.
+xattr -dr com.apple.quarantine "$(dirname "$0")/../Resources/ogphotos" 2>/dev/null || true
+open -a Terminal "$(dirname "$0")/../Resources/ogphotos/launch.sh"

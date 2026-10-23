@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}OGphotos{% endblock %} · OGphotos</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">OGphotos</a>
+    {% if not setup %}
+    <nav>
+      {% for key, label in [("upload", "Upload"), ("import", "Import"), ("groups", "Groups"), ("library", "Library"), ("people", "People"), ("trash", "Trash"), ("settings", "Settings")] %}
+      <a href="/{{ key }}" {% if active == key %}class="active" aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+  </header>
+  <main>
+    {% if models_missing(request) %}
+    <p class="banner">Similar-photo detection needs the EmbeddingGemma model. <a href="/setup/models">Set up models</a></p>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

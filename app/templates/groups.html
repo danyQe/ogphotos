@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Groups{% endblock %}
+{% block content %}
+<h1>Groups</h1>
+{% if not any_groups %}
+<p class="empty">No similar-photo groups yet.</p>
+{% else %}
+{% set year_q = "&year=%d" % year if year else "" %}
+<nav class="filters" aria-label="Filter groups">
+  {% for key, label in [("all", "All"), ("unreviewed", "Unreviewed"), ("reviewed", "Reviewed")] %}
+  <a href="?show={{ key }}{{ year_q }}" {% if show == key %}class="active" aria-current="true"{% endif %}>{{ label }}</a>
+  {% endfor %}
+  <form method="get">
+    <input type="hidden" name="show" value="{{ show }}">
+    <select name="year" onchange="this.form.submit()" aria-label="Year">
+      <option value="">All years</option>
+      {% for y in years %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+  </form>
+  <span class="muted">{{ total }} group{{ "" if total == 1 else "s" }}</span>
+</nav>
+{% if groups %}
+<ul class="group-cards">
+  {% for g in groups %}
+  <li>
+    <a class="group-card" href="/groups/{{ g.id }}">
+      <span class="strip">
+        {% for fid in g.preview_file_ids %}
+        <img src="/api/files/{{ fid }}/thumb" alt="" loading="lazy"{% if fid == g.best_file_id %} class="best"{% endif %}>
+        {% endfor %}
+      </span>
+      <span class="meta">
+        <strong>{{ g.size }} photos</strong>
+        {% if g.date_from %}
+        <span class="muted">{{ g.date_from.strftime("%d %b %Y") }}{% if g.date_to and g.date_to.date() != g.date_from.date() %} – {{ g.date_to.strftime("%d %b %Y") }}{% endif %}</span>
+        {% endif %}
+        {% if g.reviewed %}<span class="badge reviewed">Reviewed</span>{% endif %}
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?show={{ show }}{{ year_q }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+  <span class="muted">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="?show={{ show }}{{ year_q }}&page={{ page + 1 }}">Next →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="empty">No groups match this filter.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

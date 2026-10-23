@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Library{% endblock %}
+{% block content %}
+<h1>Library</h1>
+{% if not years and not p.total %}
+<p class="empty">Library is empty. <a href="/upload">Upload</a> or <a href="/import">import a folder</a>.</p>
+{% else %}
+<nav class="filters" aria-label="Filter by date">
+  <a href="/library" {% if not year %}class="active" aria-current="true"{% endif %}>All years</a>
+  {% for y, n in years %}
+  <a href="/library?year={{ y }}" {% if y == year %}class="active" aria-current="true"{% endif %}>{{ y }} <span class="muted">{{ n }}</span></a>
+  {% endfor %}
+</nav>
+{% if year and months %}
+<nav class="filters" aria-label="Filter by month">
+  <a href="/library?year={{ year }}" {% if not month %}class="active" aria-current="true"{% endif %}>All months</a>
+  {% for m, n in months %}
+  <a href="/library?year={{ year }}&month={{ m }}" {% if m == month %}class="active" aria-current="true"{% endif %}>{{ ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1] }} <span class="muted">{{ n }}</span></a>
+  {% endfor %}
+</nav>
+{% endif %}
+<p class="muted">{{ p.total }} photo{{ "" if p.total == 1 else "s" }}</p>
+{% if p.files %}
+<div class="library">
+  {% include "_library_grid.html" %}
+</div>
+{% else %}
+<p class="empty">No photos match this filter.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

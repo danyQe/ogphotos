@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Group {{ d.group.id }}{% endblock %}
+{% block content %}
+<section id="review" data-group-id="{{ d.group.id }}" data-prev-id="{{ d.prev_id or '' }}" data-next-id="{{ d.next_id or '' }}">
+<nav class="group-nav">
+  <a href="/groups">← All groups</a>
+  <span>
+    {% if d.prev_id %}<a href="/groups/{{ d.prev_id }}">‹ Prev</a>{% endif %}
+    {% if d.next_id %}<a href="/groups/{{ d.next_id }}">Next ›</a>{% endif %}
+  </span>
+</nav>
+<h1>{{ d.members | length }} similar photos{% if d.group.reviewed %} <span class="badge reviewed">Reviewed</span>{% endif %}</h1>
+<div class="toolbar">
+  <button type="button" class="button" data-action="keep-best">Keep best, trash rest <kbd>K</kbd></button>
+  <button type="button" class="button secondary" data-action="apply">Mark reviewed <kbd>Enter</kbd></button>
+  <span class="muted hint">Click a photo or press <kbd>1</kbd>–<kbd>9</kbd> to toggle keep/trash · <kbd>←</kbd>/<kbd>→</kbd> prev/next group</span>
+  <span class="status" role="status" aria-live="polite"></span>
+</div>
+<ol class="members">
+  {% for m in d.members %}
+  <li class="member{% if m.is_best %} best{% endif %}" data-file-id="{{ m.file.id }}">
+    <button type="button" class="photo" aria-pressed="false" title="Toggle keep/trash">
+      <img src="/api/files/{{ m.file.id }}/thumb" alt="{{ m.file.original_name }}" loading="lazy">
+      {% if loop.index <= 9 %}<span class="num">{{ loop.index }}</span>{% endif %}
+      <span class="state">Trash</span>
+    </button>
+    {% if m.is_best %}<span class="badge best">⭐ Suggested best</span>{% endif %}
+    <dl>
+      <dt>Name</dt><dd class="name">{{ m.file.original_name }}</dd>
+      <dt>Resolution</dt><dd>{{ m.file.width }} × {{ m.file.height }}</dd>
+      <dt>Size</dt><dd>{{ m.file.size_bytes | filesize }}</dd>
+      <dt>Taken</dt><dd>{{ m.file.taken_at.strftime("%d %b %Y %H:%M:%S") if m.file.taken_at else "—" }}</dd>
+      <dt>Sharpness</dt><dd>{{ "%.0f" | format(m.file.sharpness) if m.file.sharpness is not none else "—" }}</dd>
+      <dt>Score</dt><dd>{{ "%.2f" | format(m.score) }}</dd>
+    </dl>
+    <span class="member-actions">
+      <a href="/api/files/{{ m.file.id }}/original" target="_blank" rel="noopener">Open original ↗</a>
+      <button type="button" class="link" data-action="split">Not similar</button>
+    </span>
+  </li>
+  {% endfor %}
+</ol>
+</section>
+<script src="/static/review.js" defer></script>
+{% endblock %}

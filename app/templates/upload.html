@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Upload{% endblock %}
+{% block content %}
+<h1>Upload</h1>
+<section id="upload" data-batch-size="{{ settings.upload_batch_size }}" data-batch-max-bytes="{{ settings.upload_batch_max_bytes }}">
+  <div id="drop-zone" class="drop-zone">
+    <p>Drag photos or folders here</p>
+    <div class="actions">
+      <label class="button">Choose files<input id="file-input" type="file" multiple hidden></label>
+      <label class="button">Choose folder<input id="folder-input" type="file" webkitdirectory multiple hidden></label>
+    </div>
+  </div>
+  <p id="upload-progress" class="muted" aria-live="polite"></p>
+  <p id="upload-summary" class="summary"></p>
+  <button id="retry-failed" type="button" class="button" hidden></button>
+  <div id="analysis" class="analysis" hidden>
+    <progress id="analysis-bar" max="1" value="0"></progress>
+    <span id="analysis-text" class="muted" aria-live="polite"></span>
+  </div>
+  <ol id="upload-results" class="results"></ol>
+</section>
+<script src="/static/upload.js" defer></script>
+{% endblock %}

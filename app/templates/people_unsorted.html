@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Unsorted faces{% endblock %}
+{% block content %}
+<nav class="group-nav"><a href="/people">← People</a></nav>
+<h1>Unsorted faces <span class="muted">({{ total }})</span></h1>
+<div id="unsorted" class="toolbar face-actions">
+  <button type="button" class="button" data-action="assign">Assign to…</button>
+  <span class="status" role="status" aria-live="polite"></span>
+</div>
+<section class="faces-grid">
+  {% for f in faces %}
+  <label class="face-pick"><input type="checkbox" value="{{ f.id }}"><img src="/api/faces/{{ f.id }}/crop" alt="" loading="lazy"><a href="/files/{{ f.file_id }}" class="muted">photo</a></label>
+  {% else %}
+  <p class="muted">No unsorted faces.</p>
+  {% endfor %}
+</section>
+{% if has_more %}<p><a href="/people/unsorted?page={{ page + 1 }}">Next page →</a></p>{% endif %}
+{% include "_person_picker.html" %}
+<script src="/static/people.js" defer></script>
+{% endblock %}

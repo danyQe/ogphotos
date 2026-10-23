@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ f.original_name }}{% endblock %}
+{% block content %}
+<nav class="group-nav">
+  {% if f.is_trashed %}<a href="/trash">← Trash</a>{% else %}<a href="/library{% if f.taken_at %}?year={{ f.taken_at.year }}&month={{ f.taken_at.month }}{% endif %}">← Library</a>{% endif %}
+</nav>
+<section id="file" class="file-view" data-file-id="{{ f.id }}">
+  <div class="viewer">
+    {% if f.media_type == "video" %}
+    <video src="/api/files/{{ f.id }}/original" controls preload="metadata"></video>
+    {% elif inline %}
+    <span class="frame"><img src="/api/files/{{ f.id }}/original" alt="{{ f.original_name }}"><span class="facebox" hidden></span></span>
+    {% else %}
+    <span class="frame"><img src="/api/files/{{ f.id }}/thumb" alt="{{ f.original_name }}"><span class="facebox" hidden></span></span>
+    {% endif %}
+  </div>
+  <aside>
+    <h1 class="name">{{ f.original_name }}</h1>
+    {% if f.is_trashed %}<p><span class="badge reviewed">In Trash</span></p>{% endif %}
+    <dl class="meta">
+      <dt>Taken</dt><dd>{{ f.taken_at.strftime("%d %b %Y %H:%M:%S") if f.taken_at else "—" }}{% if f.taken_at_source %} <span class="muted">({{ f.taken_at_source }})</span>{% endif %}</dd>
+      <dt>Resolution</dt><dd>{% if f.width %}{{ f.width }} × {{ f.height }}{% else %}—{% endif %}</dd>
+      {% if f.media_type == "video" %}<dt>Length</dt><dd>{{ (f.duration_s | duration) or "—" }}</dd>{% endif %}
+      <dt>Size</dt><dd>{{ f.size_bytes | filesize }}</dd>
+      <dt>Type</dt><dd>{{ f.mime }}</dd>
+      <dt>Sharpness</dt><dd>{{ "%.0f" | format(f.sharpness) if f.sharpness is not none else "—" }}</dd>
+      <dt>Analysis</dt><dd>{{ f.analysis_status }}{% if f.analysis_error %} <span class="muted">— {{ f.analysis_error }}</span>{% endif %}</dd>
+      <dt>Group</dt><dd>{% if f.group_id %}<a href="/groups/{{ f.group_id }}">Group {{ f.group_id }}</a>{% else %}—{% endif %}</dd>
+    </dl>
+    {% if faces %}
+    <h2>People</h2>
+    <ul class="face-chips">
+      {% for face, p in faces %}
+      <li><a class="chip" href="{{ '/people/%d' % p.id if p else '/people/unsorted' }}" data-box="{{ face.box_x }},{{ face.box_y }},{{ face.box_w }},{{ face.box_h }}"><img src="/api/faces/{{ face.id }}/crop" alt="">{{ person_label(p) if p else "Unsorted" }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <div class="toolbar">
+      <a class="button secondary" href="/api/files/{{ f.id }}/original" target="_blank" rel="noopener">Open original ↗</a>
+      {% if f.is_trashed %}
+      <button type="button" class="button" data-action="restore">Restore</button>
+      {% else %}
+      <button type="button" class="button danger" data-action="trash">Move to Trash</button>
+      {% endif %}
+      <span class="status" role="status" aria-live="polite"></span>
+    </div>
+  </aside>
+</section>
+<h2>Similar photos</h2>
+{% if similar %}
+<ul class="similar">
+  {% for s, cos in similar %}
+  <li><a href="/files/{{ s.id }}" title="{{ s.original_name }}"><img src="/api/files/{{ s.id }}/thumb" alt="{{ s.original_name }}" loading="lazy"><span class="muted">{{ "%.2f" | format(cos) }}</span></a></li>
+  {% endfor %}
+</ul>
+{% elif f.media_type == "image" and f.analysis_status != "done" %}
+<p class="muted">Not analyzed yet.</p>
+{% else %}
+<p class="muted">No similar photos.</p>
+{% endif %}
+<script src="/static/file.js" defer></script>
+{% endblock %}

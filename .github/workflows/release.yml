@@ -1,0 +1,348 @@
+name: release
+
+# A `vX.Y.Z` tag builds, smoke-tests and drafts a GitHub release. "Run workflow"
+# (workflow_dispatch) is a dry run: build + smoke only, no release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag, pyproject.toml, app/__init__.py and CHANGELOG.md agree
+        id: v
+        shell: bash
+        run: |
+          pyproject=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          app=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/__init__.py)
+          echo "pyproject.toml: $pyproject  app/__init__.py: $app"
+          if [ "$app" != "$pyproject" ]; then
+            echo "::error::app/__init__.py __version__ ($app) != pyproject.toml version ($pyproject)"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            if [ "$tag" != "$pyproject" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match pyproject.toml version $pyproject"
+              exit 1
+            fi
+            # Same anchored match as the release job's notes extraction.
+            if ! awk -v head="## [$pyproject]" 'index($0, head) == 1 { found = 1 } END { exit !found }' \
+              CHANGELOG.md 2>/dev/null; then
+              echo "::error::CHANGELOG.md has no '## [$pyproject]' section"
+              exit 1
+            fi
+          fi
+          echo "version=$pyproject" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            files: dist/OGphotos-Setup-*.exe
+          - os: macos-14
+            name: macos
+            files: dist/OGphotos-*.dmg
+          # One tarball serves Linux x86_64 and aarch64 (it carries a uv binary for each).
+          - os: ubuntu-latest
+            name: linux
+            files: dist/ogphotos-*-linux.tar.gz
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned uv version
+        id: uv
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < packaging/uv-version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Build the Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/windows/build.ps1 -Version $env:VERSION
+
+      - name: Build the macOS app
+        if: runner.os == 'macOS'
+        run: sh packaging/macos/build_app.sh "$VERSION"
+
+      - name: Build the Linux tarball
+        if: runner.os == 'Linux'
+        run: sh packaging/linux/build_tar.sh "$VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ogphotos-${{ matrix.name }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  smoke:
+    needs: [version, build]
+    name: smoke (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-14
+            name: macos
+          # x86_64 only: GitHub's ubuntu-latest has no aarch64 equivalent.
+          - os: ubuntu-latest
+            name: linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ogphotos-${{ matrix.name }}
+          path: pkg
+
+      - name: Isolate OGphotos under the runner temp folder
+        shell: pwsh
+        run: |
+          $t = $env:RUNNER_TEMP
+          @(
+            'OGPHOTOS_NO_BROWSER=1',
+            'OGPHOTOS_NONINTERACTIVE=1',
+            "OGPHOTOS_HOME=$(Join-Path $t 'oghome')",
+            "OGPHOTOS_CONFIG_FILE=$(Join-Path $t 'cfg.json')",
+            "OGPHOTOS_DATA_DIR=$(Join-Path $t 'ogdata')"
+          ) | Add-Content -Path $env:GITHUB_ENV
+
+      # --- Windows: install, run, uninstall ---------------------------------------------
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = (Get-ChildItem pkg -Filter 'OGphotos-Setup-*.exe' | Select-Object -First 1).FullName
+          $dir = Join-Path $env:RUNNER_TEMP 'og'
+          $p = Start-Process -FilePath $exe -Wait -PassThru `
+            -ArgumentList "/VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /DIR=`"$dir`""
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir 'launch.cmd'))) { throw "launch.cmd not installed in $dir" }
+          Add-Content -Path $env:GITHUB_ENV -Value "OG_DIR=$dir"
+
+      - name: Launch and wait for /healthz (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'launch-out.log'
+          $proc = Start-Process -FilePath cmd.exe -PassThru -NoNewWindow `
+            -ArgumentList '/c', "`"$env:OG_DIR\launch.cmd`"" `
+            -RedirectStandardOutput $out -RedirectStandardError "$out.err"
+          $null = $proc.Handle  # keep the handle so ExitCode is readable after exit
+          # The launcher records its port in run\instance.json (it moves off 8000 if busy).
+          $inst = Join-Path $env:OGPHOTOS_HOME 'run\instance.json'
+          $deadline = (Get-Date).AddMinutes(15)
+          $ok = $false
+          while ((Get-Date) -lt $deadline) {
+            $port = 8000
+            try { $port = (Get-Content $inst -Raw -ErrorAction Stop | ConvertFrom-Json).port } catch {}
+            try {
+              $r = Invoke-RestMethod -Uri "http://127.0.0.1:$port/healthz" -TimeoutSec 5
+              if ($r.app -eq 'ogphotos') { $ok = $true; break }
+            } catch {}
+            if ($proc.HasExited) { Write-Host "::error::launcher exited early ($($proc.ExitCode))"; break }
+            Start-Sleep -Seconds 5
+          }
+          if ($ok) { Write-Host "healthz: $($r | ConvertTo-Json -Compress)" }
+          taskkill /PID $proc.Id /T /F | Out-Null
+          Get-Content $out, "$out.err" -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Host '::error::/healthz did not answer as ogphotos within 15 min'; exit 1 }
+          exit 0
+
+      # --- macOS / Linux: unpack, run ---------------------------------------------------
+      - name: Copy the app out of the dmg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mnt="$RUNNER_TEMP/dmg"
+          hdiutil attach pkg/OGphotos-*.dmg -nobrowse -readonly -mountpoint "$mnt"
+          cp -R "$mnt/OGphotos.app" "$RUNNER_TEMP/"
+          hdiutil detach "$mnt"
+          # Terminal isn't scriptable on a headless runner, so run the bundled script directly.
+          echo "OG_LAUNCH=$RUNNER_TEMP/OGphotos.app/Contents/Resources/ogphotos/launch.sh" >> "$GITHUB_ENV"
+
+      - name: Extract the tarball (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "$RUNNER_TEMP/og"
+          tar -xzf pkg/ogphotos-*-linux.tar.gz -C "$RUNNER_TEMP/og"
+          echo "OG_LAUNCH=$RUNNER_TEMP/og/ogphotos/launch.sh" >> "$GITHUB_ENV"
+
+      - name: Launch and wait for /healthz (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          kill_tree() {
+            for child in $(pgrep -P "$1"); do kill_tree "$child"; done
+            kill "$1" 2>/dev/null || true
+          }
+          out="$RUNNER_TEMP/launch-out.log"
+          "$OG_LAUNCH" >"$out" 2>&1 &
+          pid=$!
+          # The launcher records its port in run/instance.json (it moves off 8000 if busy).
+          inst="$OGPHOTOS_HOME/run/instance.json"
+          deadline=$((SECONDS + 900))
+          ok=0
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            port=8000
+            if [ -f "$inst" ]; then
+              port=$(python3 -c 'import json, sys; print(int(json.load(open(sys.argv[1]))["port"]))' "$inst" 2>/dev/null) || port=8000
+            fi
+            if body=$(curl -fsS --max-time 5 "http://127.0.0.1:$port/healthz" 2>/dev/null) \
+              && printf '%s' "$body" | python3 -c 'import json, sys; sys.exit(json.load(sys.stdin).get("app") != "ogphotos")'; then
+              echo "healthz: $body"
+              ok=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "::error::launcher exited early"
+              break
+            fi
+            sleep 5
+          done
+          kill_tree "$pid"
+          cat "$out"
+          if [ "$ok" != 1 ]; then
+            echo "::error::/healthz did not answer as ogphotos within 15 min"
+            exit 1
+          fi
+
+      # --- All OSes: a real model download from inside the installed environment ----------
+      # Proves the uv-managed Python has a working TLS trust store and follows Hugging
+      # Face's redirect to its CDN, using the app's own download code (sha256-verified).
+      - name: Download one pinned model file with the installed Python
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            py="$(cygpath -u "$OGPHOTOS_HOME")/env/Scripts/python.exe"
+            payload="$OG_DIR"
+          else
+            py="$OGPHOTOS_HOME/env/bin/python"
+            payload=$(dirname "$OG_LAUNCH")
+          fi
+          PYTHONPATH="$payload" "$py" - <<'PY'
+          import dataclasses
+          import os
+          import tempfile
+          import threading
+          from pathlib import Path
+
+          from app.config import Settings
+          from app.models_registry import EMBED_MODEL_ID, get_spec
+          from app.services.model_install import Progress, install_model, model_dir
+
+          spec = get_spec(EMBED_MODEL_ID)
+          (one,) = [f for f in spec.files if f.path == "1_Pooling/config.json"]
+          spec = dataclasses.replace(spec, files=(one,), archive=None)
+          data = Path(tempfile.mkdtemp(prefix="ogdl-", dir=os.environ["RUNNER_TEMP"]))
+          install_model(Settings(data_dir=data), spec, Progress(), threading.Event())
+          got = model_dir(Settings(data_dir=data), spec) / one.path
+          assert got.is_file() and got.stat().st_size == one.size, got
+          print(f"downloaded {one.path} ({one.size} bytes, sha256 verified) to {got}")
+          PY
+
+      - name: Uninstall keeps the Python environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # The uninstaller only ever touches %LOCALAPPDATA%\OGphotos\{python,env,cache}, not
+          # OGPHOTOS_HOME: plant a sentinel there (the runner's LOCALAPPDATA is throwaway).
+          $sentinel = Join-Path $env:LOCALAPPDATA 'OGphotos\env\.smoke-keep'
+          New-Item -ItemType File -Force -Path $sentinel | Out-Null
+          $unins = Join-Path $env:OG_DIR 'unins000.exe'
+          $p = Start-Process -FilePath $unins -Wait -PassThru -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+          if ($p.ExitCode -ne 0) { Write-Host "::error::uninstaller exited with $($p.ExitCode)"; exit 1 }
+          # The uninstaller re-launches itself from %TEMP% and returns at once: wait for it.
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Test-Path $unins) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+          if (Test-Path $unins) { Write-Host '::error::uninstaller still running after 3 min'; exit 1 }
+          if (Test-Path (Join-Path $env:OG_DIR 'launch.cmd')) { throw 'uninstall left launch.cmd behind' }
+          if (-not (Test-Path $sentinel)) { throw "silent uninstall deleted $sentinel" }
+          $envDir = Join-Path $env:OGPHOTOS_HOME 'env'
+          if (-not (Test-Path $envDir)) { throw "silent uninstall deleted $envDir" }
+          Write-Host "kept $sentinel and $envDir"
+
+      - name: Upload the log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-log-${{ matrix.name }}
+          path: |
+            ${{ env.OGPHOTOS_HOME }}/logs/ogphotos.log
+            ${{ runner.temp }}/launch-out.log*
+          if-no-files-found: warn
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [version, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ogphotos-*
+          merge-multiple: true
+          path: dist
+
+      - name: Write SHA256SUMS.txt
+        working-directory: dist
+        run: |
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS.txt"
+          mv "$RUNNER_TEMP/SHA256SUMS.txt" SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          notes="$RUNNER_TEMP/notes.md"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md is missing"
+            exit 1
+          fi
+          awk -v head="## [$VERSION]" '
+            index($0, head) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$notes"
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "::error::CHANGELOG.md has no (or an empty) '## [$VERSION]' section"
+            exit 1
+          fi
+          cat "$notes"
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" --draft --verify-tag \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "OGphotos $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/*

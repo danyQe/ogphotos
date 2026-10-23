@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Trash{% endblock %}
+{% block content %}
+<h1>Trash</h1>
+{% if not files %}
+<p class="empty">Trash is empty.</p>
+{% else %}
+<section id="trash" data-count="{{ files | length }}">
+<div class="toolbar">
+  <span><strong>{{ files | length }} photo{{ "" if files | length == 1 else "s" }}</strong> <span class="muted">· {{ size_bytes | filesize }}</span></span>
+  <button type="button" class="button secondary" data-action="restore-all">Restore all</button>
+  <button type="button" class="button danger" data-action="empty">Empty trash…</button>
+  <span class="status" role="status" aria-live="polite"></span>
+</div>
+<p class="muted">Trashed photos stay in <code>data/trash/</code> until you empty the trash. Emptying deletes them permanently.</p>
+<ul class="trash-grid">
+  {% for f in files %}
+  <li data-file-id="{{ f.id }}">
+    <img src="/api/files/{{ f.id }}/thumb" alt="{{ f.original_name }}" loading="lazy" onerror="this.remove()">
+    <span class="name">{{ f.original_name }}</span>
+    <span class="muted">{{ f.size_bytes | filesize }}{% if f.taken_at %} · {{ f.taken_at.strftime("%d %b %Y") }}{% endif %}</span>
+    <button type="button" class="link" data-action="restore">Restore</button>
+  </li>
+  {% endfor %}
+</ul>
+</section>
+<script src="/static/trash.js" defer></script>
+{% endif %}
+{% endblock %}

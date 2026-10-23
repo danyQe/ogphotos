@@ -1,0 +1,6 @@
+{% for f in p.files %}
+<a class="tile" href="/files/{{ f.id }}" title="{{ f.original_name }}"><img src="/api/files/{{ f.id }}/thumb" alt="{{ f.original_name }}" loading="lazy"></a>
+{% endfor %}
+{% if p.has_more %}
+<div class="more muted" hx-get="/people/{{ person.id }}/grid?page={{ p.page + 1 }}" hx-trigger="revealed" hx-swap="outerHTML">Loading more…</div>
+{% endif %}

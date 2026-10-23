@@ -1,0 +1,21 @@
+{# One chunk of the library grid; the last item loads the next chunk when scrolled into view. #}
+{% set ns = namespace(last=after) %}
+{% for f in p.files %}
+{% set key = f.taken_at.strftime("%Y-%m") if f.taken_at else "undated" %}
+{% if key != ns.last %}
+<h2 class="month">{{ f.taken_at.strftime("%B %Y") if f.taken_at else "Undated" }}</h2>
+{% set ns.last = key %}
+{% endif %}
+<a class="tile{% if f.media_type == 'video' %} video{% endif %}" href="/files/{{ f.id }}" title="{{ f.original_name }}">
+  {% if f.media_type == "image" %}
+  <img src="/api/files/{{ f.id }}/thumb" alt="{{ f.original_name }}" loading="lazy">
+  {% else %}
+  <span>▶ {{ f.original_name }}</span>
+  <img src="/api/files/{{ f.id }}/thumb" alt="{{ f.original_name }}" loading="lazy" onerror="this.remove()">
+  <span class="play-badge">▶{% if f.duration_s %} {{ f.duration_s | duration }}{% endif %}</span>
+  {% endif %}
+</a>
+{% endfor %}
+{% if p.has_more %}
+<div class="more muted" hx-get="/library/grid?page={{ p.page + 1 }}{% if year %}&year={{ year }}{% endif %}{% if month %}&month={{ month }}{% endif %}&after={{ ns.last }}" hx-trigger="revealed" hx-swap="outerHTML">Loading more…</div>
+{% endif %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Import{% endblock %}
+{% block content %}
+<h1>Import a folder</h1>
+<section id="import" data-job-id="{{ running.id if running else '' }}">
+  <form id="import-form" class="card">
+    <p class="muted">Paste the path of a folder on this computer, e.g. a Google Takeout year folder. Every file in it (and its subfolders) goes through the same checks as an upload, and Takeout <code>.json</code> sidecars next to each photo are used for dates. <strong>The source folder is only read, never changed.</strong></p>
+    <label class="path-field">
+      <span>Folder path</span>
+      <input type="text" name="path" placeholder="C:\Users\me\Takeout\Google Photos\Photos from 2021" required autocomplete="off" spellcheck="false">
+      <button type="button" class="button secondary" data-action="browse">Browse…</button>
+    </label>
+    <div class="toolbar">
+      <button type="submit" class="button">Start import</button>
+      <button type="button" class="button secondary" data-action="cancel" hidden>Cancel</button>
+      <span class="status" role="status" aria-live="polite"></span>
+    </div>
+  </form>
+  <div id="import-progress" class="analysis" hidden>
+    <progress max="1" value="0"></progress>
+    <span class="muted" aria-live="polite"></span>
+  </div>
+  <p id="import-summary" class="summary"></p>
+  <ol id="import-results" class="results"></ol>
+</section>
+<script src="/static/import.js" defer></script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<section id="setup" class="settings" data-default="{{ default_path }}" data-legacy="{{ legacy.path if legacy else '' }}">
+  <h1>Welcome to OGphotos</h1>
+  <form id="setup-form" class="card">
+    <h2>Where should OGphotos keep your photos?</h2>
+    <p class="muted">This folder holds the photos you add (originals, copied unchanged), their thumbnails, the Trash and OGphotos's database. It's best outside the app's own folder; by default it goes in your Pictures folder.</p>
+    <label class="path-field">
+      <span>Library folder</span>
+      <input type="text" name="path" value="{{ default_path }}" required autocomplete="off" spellcheck="false">
+      <button type="button" class="button secondary" data-action="browse">Browse…</button>
+    </label>
+    <p id="setup-check" class="muted" aria-live="polite"></p>
+
+    {% if legacy %}
+    <fieldset class="legacy">
+      <legend>You already have a library with <strong>{{ "{:,}".format(legacy.photos) }} photos</strong> at <code>{{ legacy.path }}</code></legend>
+      <label><input type="radio" name="existing" value="move" checked> Move it to the folder above <span class="muted">(fast on the same drive; nothing is copied or deleted)</span></label>
+      <label><input type="radio" name="existing" value="keep"> Keep using it where it is</label>
+      <label><input type="radio" name="existing" value="new"> Start a new, empty library <span class="muted">(the old one stays untouched)</span></label>
+    </fieldset>
+    {% endif %}
+
+    <div class="toolbar">
+      <button type="submit" class="button">Start using OGphotos</button>
+      <span class="status" role="status" aria-live="polite"></span>
+    </div>
+    <p class="muted small">Your choice is saved in <code>{{ config_file }}</code>.</p>
+  </form>
+</section>
+<script src="/static/setup.js" defer></script>
+{% endblock %}

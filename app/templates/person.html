@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ label }}{% endblock %}
+{% block content %}
+<nav class="group-nav"><a href="/people">← People</a></nav>
+<section id="person" class="person-head" data-person-id="{{ person.id }}" data-label="{{ label }}">
+  {% if cover %}<img class="cover" src="/api/faces/{{ cover }}/crop" alt="">{% endif %}
+  <input class="person-name" data-person-id="{{ person.id }}" value="{{ person.name or '' }}" placeholder="Person {{ person.label_no }}" aria-label="Name" maxlength="100">
+  <div class="toolbar">
+    <button type="button" class="button secondary" data-action="merge">Merge with…</button>
+    <button type="button" class="button secondary" data-action="hide" data-hidden="{{ 'true' if person.hidden else 'false' }}">{{ "Unhide" if person.hidden else "Hide" }}</button>
+    <span class="status" role="status" aria-live="polite"></span>
+  </div>
+</section>
+<nav class="tabs">
+  <a href="/people/{{ person.id }}" {% if view == "photos" %}aria-current="page"{% endif %}>Photos ({{ person.face_count }})</a>
+  <a href="/people/{{ person.id }}?view=faces" {% if view == "faces" %}aria-current="page"{% endif %}>Faces</a>
+</nav>
+{% if view == "faces" %}
+<div class="toolbar face-actions">
+  <button type="button" class="button danger" data-action="not-me">Not this person</button>
+  <button type="button" class="button secondary" data-action="move">Move to…</button>
+  <button type="button" class="button secondary" data-action="cover">Set as cover</button>
+</div>
+<section class="faces-grid">
+  {% for f in faces %}
+  <label class="face-pick"><input type="checkbox" value="{{ f.id }}"><img src="/api/faces/{{ f.id }}/crop" alt="" loading="lazy"><a href="/files/{{ f.file_id }}" class="muted">photo</a></label>
+  {% endfor %}
+</section>
+{% else %}
+<section class="grid">{% include "_person_grid.html" %}</section>
+{% endif %}
+{% include "_person_picker.html" %}
+<script src="/static/people.js" defer></script>
+{% endblock %}

@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned uv version
+        id: uv
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < packaging/uv-version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ steps.uv.outputs.version }}
+          python-version: "3.12"
+          enable-cache: true
+
+      - run: uv sync
+      - run: uv lock --check
+      - run: uv run ruff check .
+      - run: uv run ruff format --check app tests scripts packaging
+      - run: uv run pytest
+
+      - name: Third-party licenses are up to date
+        if: runner.os == 'Linux'
+        run: uv run python scripts/gen_third_party.py --check

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OGphotos
+Comment=Clean up your Google Takeout export, 100% offline
+Exec="@DIR@/launch.sh"
+Icon=@DIR@/icons/ogphotos.png
+Terminal=true
+Categories=Graphics;Photography;

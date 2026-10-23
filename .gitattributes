@@ -1,0 +1,7 @@
+# Launch scripts keep their native line endings on every checkout.
+packaging/launch.sh text eol=lf
+packaging/launch.cmd text eol=crlf
+packaging/macos/OGphotos text eol=lf
+packaging/macos/*.sh text eol=lf
+packaging/linux/*.sh text eol=lf
+packaging/linux/*.in text eol=lf

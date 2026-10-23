@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Set up models{% endblock %}
+{% block content %}
+<section id="setup-models" class="settings" data-setup="{{ 'true' if setup else 'false' }}">
+  <h1>Set up models</h1>
+  <p class="muted">OGphotos runs these models on your computer. Each is downloaded once, checked, and kept in your library folder; nothing is downloaded until you click <strong>Download</strong>.</p>
+  <div id="model-cards" class="settings" aria-live="polite"></div>
+  <div class="toolbar">
+    {% if setup %}
+    <a class="button secondary" href="/setup">Choose a library folder first</a>
+    {% endif %}
+    <a id="models-continue" class="button" href="/" hidden>Continue to OGphotos</a>
+    <span id="models-status" class="status" role="status" aria-live="polite"></span>
+  </div>
+</section>
+<template id="model-card">
+  <article class="card model-card">
+    <h2><span data-field="name"></span> <span class="muted small" data-field="badge"></span></h2>
+    <p data-field="purpose"></p>
+    <p class="muted small">Download size: <span data-field="size"></span></p>
+    <p class="small"><a data-field="license" target="_blank" rel="noopener noreferrer"></a> — <span data-field="license_summary"></span></p>
+    <label class="license"><input type="checkbox" data-action="accept"> <span>I accept the <span data-field="license_name"></span></span></label>
+    <progress max="1" value="0" hidden></progress>
+    <p class="muted small" data-field="progress"></p>
+    <p class="error-text small" data-field="error"></p>
+    <div class="toolbar">
+      <button type="button" class="button" data-action="download">Download</button>
+      <button type="button" class="button secondary" data-action="cancel" hidden>Cancel</button>
+      <button type="button" class="button secondary" data-action="show-import">Install from a zip file…</button>
+    </div>
+    <form class="import-zip path-field" data-action="import" hidden>
+      <span>Zip file</span>
+      <input type="text" name="zip_path" placeholder="C:\Users\you\Downloads\model.zip" autocomplete="off" spellcheck="false" required>
+      <button type="submit" class="button secondary">Install</button>
+    </form>
+  </article>
+</template>
+<script src="/static/setup_models.js" defer></script>
+{% endblock %}

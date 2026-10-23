@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block content %}
+<h1>People</h1>
+{% if not faces_state.model_installed %}
+<p class="banner">Face model not installed. <a href="/setup/models">Download it on the Set up models page</a>.</p>
+{% elif faces_state.pending %}
+<p class="banner">Scanning faces… {{ faces_state.done }} done, {{ faces_state.pending }} to go.</p>
+{% endif %}
+<nav class="toolbar">
+  <span class="status" role="status" aria-live="polite"></span>
+  <a href="/people/unsorted">Unsorted faces ({{ unsorted }})</a>
+  {% if show_hidden %}<a href="/people">Hide hidden people</a>{% else %}<a href="/people?hidden=true">Show hidden</a>{% endif %}
+</nav>
+<section id="people" class="people-grid">
+  {% for p, cover in people %}
+  <figure class="person-card{% if p.hidden %} hidden-person{% endif %}">
+    <a href="/people/{{ p.id }}">{% if cover %}<img src="/api/faces/{{ cover }}/crop" alt="" loading="lazy">{% endif %}</a>
+    <input class="person-name" data-person-id="{{ p.id }}" value="{{ p.name or '' }}" placeholder="Person {{ p.label_no }}" aria-label="Name for Person {{ p.label_no }}" maxlength="100">
+    <figcaption class="muted">{{ p.face_count }} photo{{ "s" if p.face_count != 1 }}</figcaption>
+  </figure>
+  {% else %}
+  <p class="muted">No people yet.</p>
+  {% endfor %}
+</section>
+{% include "_person_picker.html" %}
+<script src="/static/people.js" defer></script>
+{% endblock %}
