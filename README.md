@@ -10,7 +10,7 @@ OGphotos — clean up your Google Takeout export. Duplicates, similar shots, fac
 
 ## Download
 
-Website: <https://ogphotos.dev>
+Website: <https://danyqe.github.io/ogphotos>
 
 | Platform | File | Notes |
 |----------|------|-------|

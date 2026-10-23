@@ -45,3 +45,7 @@ packages to the run as artifacts. It never creates a release.
   vX.Y.Z`), commit and tag again.
 - **smoke** job: download the `smoke-log-<os>` artifact (the app log and launcher output).
 - A broken draft can simply be deleted on the Releases page and the tag re-pushed.
+
+## Website
+
+The website lives in `site/` and deploys via `.github/workflows/pages.yml`. To use a custom domain later, add `site/CNAME` and the DNS records.

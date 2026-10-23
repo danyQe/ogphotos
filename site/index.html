@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OGphotos</title>
+<meta name="description" content="OGphotos — clean up your Google Takeout export. Duplicates, similar shots, faces. 100% offline.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http&#58;//www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f6fde'/%3E%3Ctext x='32' y='43' font-family='Arial,sans-serif' font-size='28' font-weight='700' text-anchor='middle' fill='white'%3EOG%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f7f7f8; --surface: #ffffff; --text: #1c1c1f; --muted: #5c5c64;
+  --border: #e2e2e6; --accent: #2f6fde; --accent-text: #ffffff; --accent-soft: #e8f0fd;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121214; --surface: #1c1c20; --text: #ececef; --muted: #a4a4ad;
+    --border: #2d2d33; --accent: #6b9cff; --accent-text: #0b1220; --accent-soft: #1b2740;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+header { padding: 48px 0 8px; }
+h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 12px; }
+h2 { font-size: 1.3rem; margin: 0 0 12px; }
+.tagline { font-size: 1.15rem; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+section { margin: 32px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 16px; }
+.downloads { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.btn {
+  display: block; text-decoration: none; color: var(--text); background: var(--surface);
+  border: 2px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-wrap: anywhere;
+}
+.btn:hover { border-color: var(--accent); }
+.btn strong { display: block; font-size: 1.05rem; }
+.btn small { display: block; color: var(--muted); }
+.btn code { font-size: 0.8rem; color: var(--text); }
+.btn.recommended { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.recommended small { color: inherit; opacity: 0.9; }
+.btn.recommended::after { content: "Recommended for your system"; display: block; font-size: 0.75rem; margin-top: 4px; font-weight: 600; }
+#version { color: var(--muted); margin: 12px 0 0; min-height: 1.6em; }
+ul { padding-left: 1.25rem; margin: 0; }
+li { margin: 6px 0; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 24px 0 40px; color: var(--muted); font-size: 0.9rem; }
+nav.links ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+@media (max-width: 480px) { h1 { font-size: 2rem; } header { padding-top: 32px; } }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>OGphotos</h1>
+  <p class="tagline">OGphotos — clean up your Google Takeout export. Duplicates, similar shots, faces. 100% offline.</p>
+</header>
+<main class="wrap">
+  <section id="download" aria-labelledby="dl-h">
+    <h2 id="dl-h">Download</h2>
+    <div class="downloads">
+      <a class="btn" id="dl-windows" href="https://github.com/danyQe/ogphotos/releases/latest">
+        <strong>Windows (x64)</strong><small><code>OGphotos-Setup-&lt;ver&gt;.exe</code></small>
+      </a>
+      <a class="btn" id="dl-macos" href="https://github.com/danyQe/ogphotos/releases/latest">
+        <strong>macOS (Apple Silicon, macOS 14+)</strong><small><code>OGphotos-&lt;ver&gt;.dmg</code></small>
+      </a>
+      <a class="btn" id="dl-linux" href="https://github.com/danyQe/ogphotos/releases/latest">
+        <strong>Linux (x86_64/aarch64)</strong><small><code>ogphotos-&lt;ver&gt;-linux.tar.gz</code></small>
+      </a>
+    </div>
+    <p id="version" aria-live="polite"></p>
+  </section>
+
+  <section id="first-launch" class="card" aria-labelledby="fl-h">
+    <h2 id="fl-h">First launch</h2>
+    <ul>
+      <li>The app is unsigned, so your OS will warn you the first time.</li>
+      <li><strong>Windows:</strong> SmartScreen shows "Windows protected your PC". Click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+      <li><strong>macOS:</strong> right-click the app and choose <strong>Open</strong>. If it is still blocked, open <strong>System Settings → Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>.</li>
+      <li>The first run downloads about 1 GB once (usually 5–30 min). Later launches start in seconds.</li>
+      <li>Then it asks you to pick a photo folder and download the models:
+        <ul>
+          <li><strong>EmbeddingGemma 2</strong> — required, Apache-2.0.</li>
+          <li><strong>InsightFace buffalo_l</strong> — optional, non-commercial research use only.</li>
+        </ul>
+      </li>
+    </ul>
+  </section>
+
+  <section id="features" aria-labelledby="f-h">
+    <h2 id="f-h">Features</h2>
+    <ul>
+      <li><strong>Exact duplicates</strong> by SHA-256, including Takeout's year-folder plus album-folder copies.</li>
+      <li><strong>Near-duplicates</strong> by perceptual hash.</li>
+      <li><strong>Similar-shot groups</strong> from EmbeddingGemma 2 embeddings, with a suggested best photo.</li>
+      <li><strong>Fast review</strong> with keyboard shortcuts to keep the best and trash the rest.</li>
+      <li><strong>Faces and People</strong> found and clustered on your CPU.</li>
+      <li><strong>Library</strong> sorted by date taken, using EXIF and Takeout sidecars.</li>
+      <li><strong>Safe trash:</strong> only Empty trash deletes files. Your source folder is never modified.</li>
+      <li><strong>Formats:</strong> JPG, PNG, HEIC/HEIF, WEBP, GIF; MP4 and MOV videos (exact duplicates only).</li>
+    </ul>
+  </section>
+
+  <section id="privacy" aria-labelledby="p-h">
+    <h2 id="p-h">Privacy</h2>
+    <p>Nothing leaves your machine after setup. The app listens on <code>127.0.0.1</code> only, with no update checks and no telemetry. The only network use is the model download you start yourself.</p>
+  </section>
+
+  <nav class="links" aria-labelledby="l-h">
+    <h2 id="l-h">Links</h2>
+    <ul>
+      <li><a href="https://github.com/danyQe/ogphotos">GitHub repository</a></li>
+      <li><a href="https://github.com/danyQe/ogphotos#readme">README</a></li>
+      <li><a href="https://github.com/danyQe/ogphotos/blob/main/LICENSE">LICENSE (MIT)</a></li>
+      <li><a href="https://github.com/danyQe/ogphotos/blob/main/SECURITY.md">SECURITY.md</a></li>
+    </ul>
+  </nav>
+</main>
+<footer>
+  <div class="wrap">Not affiliated with Google. Google Photos is a trademark of Google LLC.</div>
+</footer>
+<script>
+(function () {
+  var ids = { windows: "dl-windows", macos: "dl-macos", linux: "dl-linux" };
+  try {
+    var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent || "";
+    var os = /win/i.test(p) ? "windows" : /mac/i.test(p) ? "macos" : (/linux|x11|cros/i.test(p) && !/android/i.test(p)) ? "linux" : "";
+    if (os) document.getElementById(ids[os]).classList.add("recommended");
+  } catch (e) {}
+  try {
+    fetch("https://api.github.com/repos/danyQe/ogphotos/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (rel) {
+        var pats = { windows: /^OGphotos-Setup-.*\.exe$/, macos: /^OGphotos-.*\.dmg$/, linux: /^ogphotos-.*-linux\.tar\.gz$/ };
+        var found = 0;
+        Object.keys(pats).forEach(function (k) {
+          var a = (rel.assets || []).filter(function (x) { return pats[k].test(x.name); })[0];
+          if (a && /^https:\/\//.test(a.browser_download_url)) {
+            document.getElementById(ids[k]).href = a.browser_download_url;
+            found++;
+          }
+        });
+        if (found && rel.tag_name) document.getElementById("version").textContent = "Latest version: " + rel.tag_name;
+      })
+      .catch(function () {});
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

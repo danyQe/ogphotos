@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://ogphotos.dev"
+Homepage = "https://danyqe.github.io/ogphotos"
 Repository = "https://github.com/danyQe/ogphotos"
 
 [dependency-groups]
