@@ -135,3 +135,16 @@ def test_model_unavailable_leaves_files_pending(db, settings: Settings, embedder
     assert "weights not downloaded" in worker.error
     with db() as s:
         assert status_counts(s)["pending"] == 1
+
+
+def test_gpu_embedder_gets_bigger_batches(db, settings: Settings, embedder) -> None:
+    tuned = settings.model_copy(update={"embed_batch_size": 2, "embed_batch_size_gpu": 6})
+    worker = _make_worker(db, tuned, embedder)
+    assert worker.batch_limit() == 2
+    embedder.device = "cuda"
+    assert worker.batch_limit() == 6
+    for i in range(6):
+        _add(db, tuned, photo_bytes(i), f"{i}.jpg")
+    _run(worker)
+    assert max(embedder.calls) > 2 and sum(embedder.calls) == 6
+    assert all(r.analysis_status == "done" for r in _rows(db).values())

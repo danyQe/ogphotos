@@ -22,6 +22,7 @@ class FakeEmbedder:
         self.nan_widths: set[int] = set()
         self.fail = False
         self.unavailable = False
+        self.device = "cpu"  # what info() reports; "cuda" exercises the GPU batch size
 
     def embed_images(self, images: list[Image.Image]) -> np.ndarray:
         self.calls.append(len(images))
@@ -40,7 +41,7 @@ class FakeEmbedder:
         return out
 
     def info(self) -> dict[str, str]:
-        return {"model": "fake", "device": "cpu", "dtype": "float32", "loaded": "true"}
+        return {"model": "fake", "device": self.device, "dtype": "float32", "loaded": "true"}
 
 
 @dataclass

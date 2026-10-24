@@ -30,7 +30,7 @@ The downloads are not code-signed yet, so your OS will warn you once.
 
 ## What the first run does
 
-1. A launch script prints `Setting up OGphotos (one-time download of about 1 GB; usually 5–30 min)…` and installs its own Python environment. This happens once. Later launches start in seconds.
+1. A launch script prints `Setting up OGphotos (one-time download of about 1 GB; usually 5–30 min)…` and installs its own Python environment. On a PC with an NVIDIA GPU (driver 580 or newer, GeForce RTX 20 series / GTX 16 series or newer) it says "for your NVIDIA GPU" instead and downloads the CUDA builds (about 4 GB), so photo analysis and face scanning run on the GPU; everything else uses the CPU builds. Macs with Apple Silicon use their GPU either way. Set `OGPHOTOS_TORCH=cpu` (or `cuda`) before launching to override the detection. This happens once. Later launches start in seconds.
 2. Your browser opens. The **setup page** asks where to keep your photos, library and models (the *data folder*).
 3. The **models page** (`/setup/models`) shows each model's license. Accept and download:
    - **EmbeddingGemma 2** — required, Apache-2.0, about 1.5 GB. Finds similar photos.
@@ -92,6 +92,8 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync && uv run python -m app.launcher
 ```
+
+On an NVIDIA machine, install the CUDA builds instead: `uv sync --no-default-groups --group dev --group cuda`, then use `uv run --no-sync` (a plain `uv run` switches back to the CPU group).
 
 For development, run the server with auto-reload instead (http://127.0.0.1:8000):
 

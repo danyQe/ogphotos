@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     port_range_end: int = 8010  # launcher tries port..port_range_end
     embed_model: str = "google/embeddinggemma-2"
     embed_batch_size: int = 16
+    # Used once the model is on cuda/mps; the embedder halves it on out-of-memory
+    embed_batch_size_gpu: int = 32
     embed_dim: int = 512  # Matryoshka truncation; 512 is near-lossless for images, never 128
     device: str = "auto"  # auto | cuda | mps | cpu
     # Vision soft tokens per image (70–1120). 140 ranks like the default 280 (r=0.994 on
@@ -26,6 +28,8 @@ class Settings(BaseSettings):
     # Photos are decoded once for analysis at this long edge (the model resizes anyway)
     analysis_max_side: int = 1024
     sharpness_max_side: int = 1024
+    # Threads decoding photos ahead of the model (decode, not inference, bounds a GPU)
+    decode_workers: int = 4
 
     # Similarity thresholds (defaults; user-adjustable copies live in the settings table)
     phash_max_distance: int = 8

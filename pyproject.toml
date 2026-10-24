@@ -1,6 +1,6 @@
 [project]
 name = "ogphotos"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
@@ -8,7 +8,6 @@ dependencies = [
     "imagehash>=4.3.2",
     "jinja2>=3.1.6",
     "numpy>=2.4.6",
-    "onnxruntime>=1.31.0",
     "opencv-python-headless>=5.0.0.93",
     "pillow>=12.3.0",
     "pillow-heif>=1.8.1",
@@ -16,8 +15,6 @@ dependencies = [
     "python-multipart>=0.0.32",
     "sentence-transformers>=6.1.0",
     "sqlalchemy>=2.1.4",
-    "torch>=2.14.1",
-    "torchvision>=0.29.1",
     "transformers>=5.19.0",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -33,8 +30,20 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.17.0",
 ]
+# Inference runtimes, exactly one group per environment. The launcher installs cuda on
+# machines with a recent NVIDIA driver (packaging/launch.*) and cpu everywhere else; the
+# app then uses the GPU when torch/onnxruntime can see one and falls back to the CPU.
+cpu = ["onnxruntime>=1.31.0", "torch>=2.14.1", "torchvision>=0.29.1"]
+cuda = [
+    "onnxruntime-gpu>=1.31.0; sys_platform != 'darwin'",
+    "onnxruntime>=1.31.0; sys_platform == 'darwin'",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+]
 
 [tool.uv]
+default-groups = ["dev", "cpu"]
+conflicts = [[{ group = "cpu" }, { group = "cuda" }]]
 environments = [
     "sys_platform == 'win32' and platform_machine == 'AMD64'",
     "sys_platform == 'darwin' and platform_machine == 'arm64'",
@@ -46,9 +55,21 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
+# CUDA 13 to match onnxruntime-gpu 1.31 (driver 580+, compute capability 7.5+)
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
 [tool.uv.sources]
-torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
-torchvision = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
+torch = [
+    { index = "pytorch-cpu", group = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda", marker = "sys_platform != 'darwin'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", group = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda", marker = "sys_platform != 'darwin'" },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

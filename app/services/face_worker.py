@@ -3,6 +3,7 @@ so uploads, imports, restores and the first-run backfill need no extra wiring.""
 
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -167,6 +168,12 @@ class FaceWorker:
                 log.exception("face batch failed: %s", ids)
                 self._stop.wait(ERROR_WAIT)
 
+    def _decode(self, path: Path) -> tuple[Image.Image, float] | Exception:
+        try:
+            return load_for_faces(path, self.settings.face_det_max_side)
+        except Exception as e:
+            return e
+
     def process(self, file_ids: list[int]) -> None:
         s = self.settings
         with self._busy:
@@ -183,11 +190,14 @@ class FaceWorker:
                 ).all()
                 crops: list[tuple[Face, Image.Image, tuple[float, float, float, float]]] = []
                 now = datetime.now(UTC).replace(tzinfo=None)
-                for row in rows:
+                paths = [s.data_dir / row.stored_path for row in rows]
+                with ThreadPoolExecutor(max(1, s.decode_workers)) as pool:
+                    decoded = list(pool.map(self._decode, paths))
+                for row, loaded in zip(rows, decoded, strict=True):
                     try:
-                        img, scale = load_for_faces(
-                            s.data_dir / row.stored_path, s.face_det_max_side
-                        )
+                        if isinstance(loaded, Exception):
+                            raise loaded
+                        img, scale = loaded
                         detected = self.engine.detect(img, min_score, min_px * scale)
                     except FaceModelUnavailableError:
                         raise

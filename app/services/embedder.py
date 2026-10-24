@@ -48,6 +48,7 @@ class GemmaEmbedder:
         self._model: Any = None
         self._device = ""
         self._dtype = ""
+        self._max_chunk = 0  # 0 = no cap; set after an out-of-memory
         self._lock = threading.Lock()
 
     def _ensure_loaded(self) -> Any:
@@ -80,7 +81,27 @@ class GemmaEmbedder:
             return self._model
 
     def embed_images(self, images: list[Image.Image]) -> np.ndarray:
+        """Embed in chunks; on GPU out-of-memory, halve the chunk and keep the smaller cap."""
         model = self._ensure_loaded()
+        out: list[np.ndarray] = []
+        start = 0
+        while start < len(images):
+            chunk = images[start : start + (self._max_chunk or len(images))]
+            try:
+                out.append(self._encode(model, chunk))
+            except Exception as e:
+                if len(chunk) == 1 or "out of memory" not in str(e).lower():
+                    raise
+                self._max_chunk = len(chunk) // 2
+                log.warning(
+                    "out of memory at batch %d; retrying at %d", len(chunk), self._max_chunk
+                )
+                self._empty_cache()
+                continue
+            start += len(chunk)
+        return np.concatenate(out) if out else np.empty((0, self.dim), dtype=np.float32)
+
+    def _encode(self, model: Any, images: list[Image.Image]) -> np.ndarray:
         # Images take no task prefix. {"image": PIL} and bare PIL embed identically
         # (scripts/embed_smoke.py); the dict form is the documented multimodal input.
         vecs = model.encode(
@@ -91,6 +112,12 @@ class GemmaEmbedder:
             convert_to_numpy=True,
         )
         return np.asarray(vecs, dtype=np.float32)
+
+    def _empty_cache(self) -> None:
+        if self._device in ("cuda", "mps"):
+            import torch
+
+            getattr(torch, self._device).empty_cache()
 
     def info(self) -> dict[str, str]:
         return {

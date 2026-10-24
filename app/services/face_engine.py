@@ -1,8 +1,10 @@
 """Face detection + embedding behind an interface (tests inject a fake).
 
 InsightFace buffalo_l: SCRFD-10G finds faces and 5 landmarks, ArcFace R50 embeds a
-112×112 aligned crop. Run with onnxruntime on CPU. Weights are for non-commercial use."""
+112×112 aligned crop. Run with onnxruntime, on a GPU provider when the installed build has
+one (see select_providers). Weights are for non-commercial use."""
 
+import logging
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +22,8 @@ from app.services.face_geometry import (
     distance2kps,
     nms,
 )
+
+log = logging.getLogger(__name__)
 
 FACE_DIM = 512
 DET_FILE = "det_10g.onnx"
@@ -39,6 +43,33 @@ class DetectedFace:
 
 class FaceModelUnavailableError(RuntimeError):
     pass
+
+
+def select_providers(requested: str, available: list[str]) -> list[str]:
+    """onnxruntime providers for `Settings.device`, CPU always last as the fallback.
+
+    auto/cuda use CUDA (onnxruntime-gpu), auto also DirectML (onnxruntime-directml);
+    whichever onnxruntime build is installed decides what is available. CoreML only
+    when asked for with "mps": it recompiles the recognizer for every face count."""
+    wanted = {
+        "auto": ["CUDAExecutionProvider", "DmlExecutionProvider"],
+        "cuda": ["CUDAExecutionProvider"],
+        "mps": ["CoreMLExecutionProvider"],
+    }.get(requested, [])
+    gpu = [p for p in wanted if p in available][:1]
+    return [*gpu, "CPUExecutionProvider"]
+
+
+def _preload_cuda_libraries(ort: Any) -> None:
+    """onnxruntime-gpu ships no CUDA/cuDNN; reuse the CUDA 13 libraries the cu130 torch
+    wheels bring (loaded by importing torch, or found in the nvidia-* packages). On
+    failure ORT drops the CUDA provider and the session runs on the CPU."""
+    try:
+        import torch  # noqa: F401
+
+        ort.preload_dlls()
+    except Exception as e:
+        log.warning("could not preload CUDA libraries for onnxruntime: %s", e)
 
 
 class FaceEngine(Protocol):
@@ -77,6 +108,7 @@ class InsightFaceEngine:
             "model": "InsightFace buffalo_l (SCRFD-10G + ArcFace R50)",
             "installed": str(self.available()).lower(),
             "loaded": str(self._det is not None).lower(),
+            "providers": ", ".join(self._det.get_providers()) if self._det else "not loaded",
             "dir": str(self.model_dir),
         }
 
@@ -89,13 +121,22 @@ class InsightFaceEngine:
                     )
                 import onnxruntime as ort
 
-                providers = ["CPUExecutionProvider"]
+                providers = select_providers(self.settings.device, ort.get_available_providers())
+                if "CUDAExecutionProvider" in providers:
+                    _preload_cuda_libraries(ort)
+                options = ort.SessionOptions()
+                if "DmlExecutionProvider" in providers:
+                    # DirectML supports neither memory patterns nor parallel execution
+                    options.enable_mem_pattern = False
+                    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
                 self._det = ort.InferenceSession(
-                    str(self.model_dir / DET_FILE), providers=providers
+                    str(self.model_dir / DET_FILE), options, providers=providers
                 )
                 self._rec = ort.InferenceSession(
-                    str(self.model_dir / REC_FILE), providers=providers
+                    str(self.model_dir / REC_FILE), options, providers=providers
                 )
+                # ORT silently drops a GPU provider whose runtime libraries are missing
+                log.info("face model on %s", ", ".join(self._det.get_providers()))
         return self._det, self._rec
 
     def detect(self, image: Image.Image, min_score: float, min_side: float) -> list[DetectedFace]:

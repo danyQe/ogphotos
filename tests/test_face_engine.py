@@ -3,7 +3,11 @@ import pytest
 from PIL import Image
 
 from app.config import Settings
-from app.services.face_engine import FaceModelUnavailableError, InsightFaceEngine
+from app.services.face_engine import (
+    FaceModelUnavailableError,
+    InsightFaceEngine,
+    select_providers,
+)
 from tests.faceutil import face_vec
 from tests.fakes import FakeFace, FakeFaceEngine
 
@@ -32,3 +36,26 @@ def test_fake_engine_filters_like_the_real_one() -> None:
     faces = eng.detect(Image.new("RGB", (64, 48)), 0.5, 20)
     assert len(faces) == 1 and faces[0].score == 0.9
     assert eng.detect(Image.new("RGB", (10, 10)), 0.5, 20) == []
+
+
+CPU = "CPUExecutionProvider"
+CUDA = "CUDAExecutionProvider"
+DML = "DmlExecutionProvider"
+COREML = "CoreMLExecutionProvider"
+
+
+@pytest.mark.parametrize(
+    ("device", "available", "expected"),
+    [
+        ("auto", [CPU], [CPU]),
+        ("auto", [CUDA, CPU], [CUDA, CPU]),
+        ("auto", [DML, CPU], [DML, CPU]),
+        ("auto", [CUDA, DML, CPU], [CUDA, CPU]),
+        ("auto", [COREML, CPU], [CPU]),  # dynamic-batch recognizer: CoreML not by default
+        ("cpu", [CUDA, CPU], [CPU]),
+        ("cuda", [DML, CPU], [CPU]),
+        ("mps", [COREML, CPU], [COREML, CPU]),
+    ],
+)
+def test_select_providers(device, available, expected) -> None:
+    assert select_providers(device, available) == expected

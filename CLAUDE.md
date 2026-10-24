@@ -43,4 +43,4 @@ uv add <pkg>                              # add a dependency (never pip install)
 - Use `truncate_dim=512, normalize_embeddings=True`. Don't use 128d for images.
 - Face boxes are fractions of the upright photo (`files.width/height` are pre-rotation).
 - InsightFace weights are non-commercial only.
-- torch/torchvision are pinned to the CPU index on Windows/Linux via `[tool.uv.sources]` in `pyproject.toml`. For a CUDA dev setup, override the source locally and do not commit it.
+- torch/torchvision/onnxruntime live in two conflicting dependency groups, `cpu` (default) and `cuda` (cu130 torch + onnxruntime-gpu, CUDA 13). The launchers pick `cuda` when `nvidia-smi` reports driver 580+ and compute capability 7.5+, else `cpu`; `OGPHOTOS_TORCH` overrides. Dev GPU: `uv sync --no-default-groups --group dev --group cuda`, then `uv run --no-sync`. The app itself always tries GPU first and falls back to CPU.

@@ -3,7 +3,8 @@ rem OGphotos launcher for Windows.
 rem
 rem The download ships the app source, uv.lock and a pinned uv binary. The first launch (and
 rem the first after an upgrade changes uv.lock) builds the Python environment with
-rem "uv sync --frozen --no-dev" in the per-user app folder; later launches skip uv entirely
+rem "uv sync --frozen" (app + one runtime group, no dev tools) in the per-user app folder, and
+rem again if the runtime group changes (e.g. an NVIDIA GPU appears); later launches skip uv entirely
 rem and start the environment's Python directly, so they make no network calls.
 rem
 rem Two double-clicks during the first-run sync are safe without a lock here: uv holds its
@@ -51,22 +52,40 @@ for /f "skip=1 delims=" %%h in ('certutil -hashfile uv.lock SHA256') do if not d
 popd
 if defined HASH set "HASH=%HASH: =%"
 
+rem Runtime group from pyproject.toml: "cuda" (CUDA 13 torch + onnxruntime-gpu) needs an
+rem NVIDIA driver 580+ and compute capability 7.5+; anything else gets "cpu". The app uses
+rem the GPU when it can and falls back to the CPU either way. OGPHOTOS_TORCH=cpu|cuda overrides.
+set "GROUP=cpu"
+if /i "%OGPHOTOS_TORCH%"=="cuda" set "GROUP=cuda"
+if defined OGPHOTOS_TORCH goto :group_done
+set "DRV="
+set "CC="
+for /f "tokens=1 delims=. " %%a in ('nvidia-smi --query-gpu^=driver_version --format^=csv^,noheader 2^>nul') do if not defined DRV set "DRV=%%a"
+for /f "tokens=1,2 delims=. " %%a in ('nvidia-smi --query-gpu^=compute_cap --format^=csv^,noheader 2^>nul') do if not defined CC set "CC=%%a%%b"
+if not defined DRV goto :group_done
+if not defined CC goto :group_done
+rem Digits only, so GEQ compares numbers (a "[N/A]" would otherwise compare as text).
+echo %DRV%%CC%| findstr /r "^[0-9][0-9]*$" >nul || goto :group_done
+if %DRV% GEQ 580 if %CC% GEQ 75 set "GROUP=cuda"
+:group_done
+
 set "OLD="
 if exist "%MARKER%" set /p OLD=<"%MARKER%"
 
 if not defined HASH goto :sync
-if not "%HASH%"=="%OLD%" goto :sync
+if not "%HASH% %GROUP%"=="%OLD%" goto :sync
 if not exist "%PY%" goto :sync
 goto :run
 
 :sync
 chcp 65001 >nul
-echo Setting up OGphotos (one-time download of about 1 GB; usually 5–30 min)…
+if "%GROUP%"=="cuda" echo Setting up OGphotos for your NVIDIA GPU (one-time download of about 4 GB; usually 10–60 min)…
+if not "%GROUP%"=="cuda" echo Setting up OGphotos (one-time download of about 1 GB; usually 5–30 min)…
 if defined OLDCP chcp %OLDCP% >nul
 if not exist "%HOME_DIR%" mkdir "%HOME_DIR%"
-"%UV%" sync --frozen --no-dev --project "%HERE%"
+"%UV%" sync --frozen --no-default-groups --group %GROUP% --project "%HERE%"
 if errorlevel 1 goto :sync_failed
-if defined HASH >"%MARKER%" echo %HASH%
+if defined HASH >"%MARKER%" echo %HASH% %GROUP%
 
 :run
 rem "python -m" puts the current folder first on sys.path; run from here so an unrelated

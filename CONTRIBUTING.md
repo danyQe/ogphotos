@@ -7,8 +7,8 @@ Thanks for helping. Please read the [Code of Conduct](CODE_OF_CONDUCT.md) first.
 You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync                                  # install dependencies
-uv run python -m app.launcher            # run the app
+uv sync                                  # install dependencies (CPU torch/onnxruntime)
+uv sync --no-default-groups --group dev --group cuda   # NVIDIA GPU instead; then `uv run --no-sync`uv run python -m app.launcher            # run the app
 uv run uvicorn app.main:create_app --factory --reload   # or the dev server at http://127.0.0.1:8000
 ```
 

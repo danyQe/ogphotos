@@ -142,7 +142,7 @@ From the model card (keep in `docs/embeddinggemma-2-model-card.md`):
 - Guard: if any embedding contains NaN, mark file `failed` with error and log loudly.
 - Offline: the repo is public (Apache-2.0, no login). Download once via `scripts/embed_smoke.py`; at runtime the model loads with `local_files_only=True`. If it can't load, files stay `pending` and `/api/status` reports the error.
 - Lazy-load the model on first use, not at import time, so the server starts fast.
-- Device: CUDA → MPS (Apple) → CPU. If MPS gives errors with bf16, use float32.
+- Device: CUDA → MPS (Apple) → CPU. If MPS gives errors with bf16, use float32. On a GPU the worker batches `embed_batch_size_gpu` photos (halved on out-of-memory); photos are decoded on `decode_workers` threads so the GPU is not left waiting. GPU builds of torch are installed only where usable (see packaging/launch.*).
 
 ## 6. Grouping
 
@@ -265,7 +265,7 @@ The server only listens on localhost, but any web page in the browser can still 
 ## 13. Faces & people
 
 
-- **Model**: InsightFace `buffalo_l` (SCRFD-10G detector + ArcFace R50, 512-d) on onnxruntime, CPU. Installed once with `uv run python scripts/fetch_face_model.py` (`--zip PATH` reuses a download) into `{data_dir}/models/buffalo_l/`; the app never downloads. Weights are non-commercial only. Without the model everything else works and the Settings page shows the install command.
+- **Model**: InsightFace `buffalo_l` (SCRFD-10G detector + ArcFace R50, 512-d) on onnxruntime: CUDA (onnxruntime-gpu, reusing the CUDA libraries of the cu130 torch) or DirectML when that build is installed, else CPU; CoreML only with `device=mps`. Installed once with `uv run python scripts/fetch_face_model.py` (`--zip PATH` reuses a download) into `{data_dir}/models/buffalo_l/`; the app never downloads. Weights are non-commercial only. Without the model everything else works and the Settings page shows the install command.
 - **Tables**: `faces` (box as fractions of the upright photo, `det_score`, float32 embedding, `person_id`, `assigned_by` auto/user), `people` (`label_no` sequential, never reused; `name`; `cover_face_id`; cached `face_count`; `hidden`), `face_exclusions` (`face_id`, `person_id` = "not this person"); `files` gains `face_status`, `face_error`, `face_count`. Crops live in `{data_dir}/faces/{face_id}.jpg` and are deleted only by Empty Trash.
 - **Pipeline**: `FaceWorker` polls `face_status = pending` images (backfill resumes after restart), detects on the EXIF-upright image (long side <= `face_det_max_side`), keeps faces with score >= `face_min_score` and short side >= `face_min_px`, aligns to 112x112, embeds, L2-normalizes (NaN/zero-norm dropped), writes rows and crops.
 - **Clustering** (`PeopleClusterer`, one lock): incremental assignment votes among the top `face_neighbors` neighbours with cosine >= `face_match_cosine` (respecting exclusions); unassigned faces form a new person once >= `face_min_cluster` agree. Full recluster keeps user-assigned faces and named people fixed and runs DBSCAN-style clustering (`eps = 1 - face_match_cosine`) on the rest, reusing old unnamed person ids. Lock order: `Grouper.lock` then `PeopleClusterer.lock`; `FaceWorker._busy` then `PeopleClusterer.lock`.

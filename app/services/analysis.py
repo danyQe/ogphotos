@@ -1,6 +1,7 @@
 import logging
 import queue
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -96,6 +97,18 @@ class AnalysisWorker:
         with q.all_tasks_done:
             return q.all_tasks_done.wait_for(lambda: q.unfinished_tasks == 0, timeout)
 
+    def batch_limit(self) -> int:
+        """Bigger batches once the model is on a GPU (the device is known after first load)."""
+        on_gpu = self.embedder.info().get("device") in ("cuda", "mps")
+        return self.settings.embed_batch_size_gpu if on_gpu else self.settings.embed_batch_size
+
+    def _decode(self, path: Path) -> tuple[Image.Image, float] | Exception:
+        try:
+            img = load_for_analysis(path, self.settings.analysis_max_side)
+            return img, sharpness(img, self.settings.sharpness_max_side)
+        except Exception as e:
+            return e
+
     def _run(self) -> None:
         # Group writes from here and from review actions serialize on grouper.lock.
         if self.grouper is not None:
@@ -108,7 +121,8 @@ class AnalysisWorker:
                 batch = [self._queue.get(timeout=0.5)]
             except queue.Empty:
                 continue
-            while len(batch) < self.settings.embed_batch_size:
+            limit = self.batch_limit()
+            while len(batch) < limit:
                 try:
                     batch.append(self._queue.get_nowait())
                 except queue.Empty:
@@ -136,16 +150,16 @@ class AnalysisWorker:
                     File.is_trashed.is_(False),
                 )
             ).all()
+            paths = [self.settings.data_dir / row.stored_path for row in rows]
+            with ThreadPoolExecutor(max(1, self.settings.decode_workers)) as pool:
+                decoded = list(pool.map(self._decode, paths))
             loaded: list[tuple[File, Image.Image]] = []
-            for row in rows:
-                try:
-                    img = load_for_analysis(
-                        self.settings.data_dir / row.stored_path, self.settings.analysis_max_side
-                    )
-                    row.sharpness = sharpness(img, self.settings.sharpness_max_side)
-                    loaded.append((row, img))
-                except Exception as e:
-                    self._fail(row, f"could not read image: {e}")
+            for row, result in zip(rows, decoded, strict=True):
+                if isinstance(result, Exception):
+                    self._fail(row, f"could not read image: {result}")
+                    continue
+                img, row.sharpness = result
+                loaded.append((row, img))
             done = [(row, vec) for row, vec in self._embed(loaded) if vec is not None]
             for row, vec in done:
                 row.embedding = to_blob(vec)

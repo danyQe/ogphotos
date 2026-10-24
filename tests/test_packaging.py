@@ -2,6 +2,7 @@ import hashlib
 import io
 import sys
 import tarfile
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -150,8 +151,14 @@ def test_launch_scripts_set_uv_env() -> None:
             "PYTHONPATH",
         ):
             assert var in text, (name, var)
-        assert "--frozen" in text and "--no-dev" in text and ".lock-hash" in text
+        assert "--frozen" in text and "--no-default-groups --group" in text
+        assert ".lock-hash" in text
         assert "Setting up OGphotos (one-time download of about 1 GB; usually 5–30 min)…" in text
+        assert "Setting up OGphotos for your NVIDIA GPU (one-time download of about 4 GB" in text
+        # GPU builds only where they can run; OGPHOTOS_TORCH overrides the detection
+        assert "nvidia-smi --query-gpu" in text  # launch.cmd escapes "=" as "^="
+        assert "driver_version" in text and "compute_cap" in text
+        assert "580" in text and "75" in text and "OGPHOTOS_TORCH" in text
         assert "check your internet connection and re-run" in text
         assert "OGPHOTOS_NONINTERACTIVE" in text
         assert "-m app.launcher" in text
@@ -168,6 +175,16 @@ def test_launch_cmd_repair_hint_only_for_codes_from_2() -> None:
     text = (ROOT / "packaging" / "launch.cmd").read_text(encoding="utf-8")
     assert "if %RC% GEQ 2 goto :start_failed" in text
     assert '"%RC%"==' not in text
+
+
+def test_runtime_groups_match_launchers() -> None:
+    # the launcher's group names must exist and conflict, or `uv sync --group` fails
+    conf = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    groups = conf["dependency-groups"]
+    assert {"cpu", "cuda"} <= groups.keys()
+    assert conf["tool"]["uv"]["conflicts"] == [[{"group": "cpu"}, {"group": "cuda"}]]
+    assert "cpu" in conf["tool"]["uv"]["default-groups"]
+    assert not any(d.startswith(("torch", "onnxruntime")) for d in conf["project"]["dependencies"])
 
 
 def test_launch_sh_uses_lf() -> None:

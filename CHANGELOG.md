@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-24
+
+### Added
+
+- GPU acceleration with automatic CPU fallback. On a PC with an NVIDIA GPU (driver 580 or newer, GeForce GTX 16 / RTX 20 series or newer) the first launch installs the CUDA builds (about 4 GB) and photo analysis and face scanning run on the GPU. Other PCs keep the CPU builds (about 1 GB). Apple Silicon Macs already use their GPU for photo analysis.
+- `OGPHOTOS_TORCH=cpu` or `cuda` overrides the GPU detection at launch.
+
+### Changed
+
+- Bigger analysis batches on a GPU (`embed_batch_size_gpu`, default 32), halved automatically if the GPU runs out of memory.
+- Photos are decoded on several threads (`decode_workers`, default 4) for analysis and face scanning, which is faster on CPU too.
+- Existing installs set up their Python environment once more on the first launch after updating.
+
 ## [0.1.0] - 2026-10-23
 
 First public release.
