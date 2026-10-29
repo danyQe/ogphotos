@@ -1,6 +1,6 @@
 # OGphotos
 
-OGphotos — clean up your Google Takeout export. Duplicates, similar shots, faces. 100% offline.
+OGphotos — clean up your Google Takeout export. Duplicates, similar shots, faces. Works offline after a one-time model download.
 
 <!-- Screenshots and a short GIF go in docs/images/ (recorded from the demo library built by
      scripts/make_demo_library.py). Placeholder until the owner adds them:
@@ -46,7 +46,7 @@ Then open **Import** and pick your Takeout `Google Photos` folder. OGphotos only
 - **Near-duplicates** by perceptual hash, shown as thumbnails of what they resemble.
 - **Similar-shot groups** from EmbeddingGemma 2 embeddings (cosine similarity) plus pHash. Every photo in a group must be similar to every other. A suggested best photo is starred (sharpness, resolution, file size).
 - **Fast review:** click or press `1`–`9` to mark photos for trash, `Enter` to apply, `K` to keep the best and trash the rest. **Not similar** splits a photo out for good.
-- **Faces and People:** faces are found and clustered on your CPU. Rename, merge, hide or reassign people.
+- **Faces and People:** faces are found and clustered with InsightFace through onnxruntime, on the GPU when your install has a GPU build (NVIDIA CUDA or DirectML) and on the CPU otherwise. Rename, merge, hide or reassign people.
 - **Library:** every photo by date taken with year/month filters. Dates come from EXIF, then Takeout `.json` / `.supplemental-metadata.json` sidecars, then file time.
 - **Safe trash:** trashed photos are moved to `trash/` in your data folder. **Empty trash** is the only action that deletes files.
 - **Formats:** JPG, PNG, HEIC/HEIF, WEBP, GIF; MP4 and MOV videos (exact duplicates only).
